@@ -1,6 +1,7 @@
 // Faz a importação das bibliotecas
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 // Função para registrar um novo usuário no banco de dados
 export const register = async (req, res) => {
@@ -33,23 +34,26 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Busca o usuário no banco pelo e-mail
+    // Busca o usuário no banco
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado!"});
+      return res.status(404).json({ message: "Usuário não encontrado!" });
     }
 
-    // Compara a senha digitada com a senha salva no banco de dados
+    // Verifica se a senha está correta
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Senha incorreta!" });
     }
 
-    // Se a senha estiver correta, retorna os dados do usuário (sem a senha)
+    // **🔹 Gerar token JWT**
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+    // Retorna dados do usuário + token
     return res.status(200).json({
       message: "Login realizado com sucesso!",
+      token,  // ✅ Agora retornamos o token
       user: {
-        userId: user.userId,
         nome: user.nome,
         email: user.email,
         bloco: user.bloco,
