@@ -7,7 +7,7 @@ const router = express.Router();
 router.get("/", getUsers);
 
 // Rota para atualizar usuário
-router.put("/use/:id", updateUser);
+router.put("/:id", updateUser);
 
 // Rota para deletar usuário
 router.delete("/:id", deleteUser);
