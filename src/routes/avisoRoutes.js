@@ -6,7 +6,7 @@ import {
   listarAvisosPorUsuario,
   atualizarAviso,
   deletarAviso,
-} from "../controllers/AvisoController.js";
+} from "../controllers/avisoController.js";
 
 const router = express.Router();
 
