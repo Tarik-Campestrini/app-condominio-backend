@@ -1,0 +1,12 @@
+import mongoose from "mongoose";
+
+const avisosSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  titulo: { type: String, required: true },
+  menssagem: { type: String, required: true },
+  dataAviso: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+const Avisos = mongoose.model("Avisos", avisosSchema);
+
+export default Avisos;
