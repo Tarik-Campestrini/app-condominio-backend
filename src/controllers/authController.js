@@ -2,6 +2,7 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { sendTemplateMessageCadastrar } from "../services/whatsappService.js"; // ✅ Importação do serviço WhatsApp
 
 // Função para registrar um novo usuário no banco de dados
 export const register = async (req, res) => {
@@ -22,9 +23,19 @@ export const register = async (req, res) => {
 
     await newUser.save(); // Salva o usuário no banco de dados
 
+    // ✅ Envia notificação via WhatsApp
+    try {
+      await sendTemplateMessageCadastrar(telefone, nome, email, password);
+      console.log(`✅ Mensagem de boas-vindas enviada para: ${telefone}`);
+    } catch (whatsErr) {
+      console.error("❌ Erro ao enviar WhatsApp:", whatsErr?.response?.data || whatsErr.message);
+    }
+
+    // Retorna sucesso
     return res.status(201).json({ message: "Usuário criado com sucesso!" });
+
   } catch (error) {
-    console.error(error);
+    console.error("Erro no cadastro:", error);
     return res.status(500).json({ error: "Erro ao cadastrar usuário" });
   }
 };

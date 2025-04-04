@@ -1,5 +1,7 @@
 import Aviso from "../models/avisoModel.js";
 import User from "../models/User.js";
+import mongoose from "mongoose";
+//import { sendTemplateMessageAviso } from "../services/whatsappService.js";
 
 export const criarAviso = async (req, res) => {
   try {
@@ -10,37 +12,50 @@ export const criarAviso = async (req, res) => {
       }
 
       if (userId === "todos") {
-          console.log("Criando aviso para todos os usuários...");
+          console.log("Criando um único aviso para todos os usuários...");
 
-          // Busca todos os usuários
-          const usuarios = await User.find();
-          if (!usuarios.length) {
-              return res.status(400).json({ message: "Nenhum usuário encontrado" });
-          }
+          // Criar um único aviso para todos
+          const novoAviso = await Aviso.create({ titulo, menssagem, userId: "todos" });
 
-          console.log(`Usuários encontrados: ${usuarios.length}`);
+          // Buscar todos os usuários que têm telefone para enviar WhatsApp
+          const usuarios = await User.find({ telefone: { $exists: true, $ne: null } });
 
-          // Cria um aviso para cada usuário
-          const avisosCriados = await Promise.all(
-              usuarios.map(async (usuarios) => {
-                  return await Aviso.create({ titulo, menssagem, userId: usuarios._id });
-              })
-          );
+          // Essa função não está sendo utilizada no momento, mas pode ser utilizada para enviar mensagens de aviso
+          /*
+          // Enviar mensagem para cada usuário via WhatsApp
+          await Promise.all(
+              usuarios.map((usuario) => 
+                  sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem)
+              )
+          ); */
 
-          console.log("Avisos criados:", avisosCriados.length);
-
-          return res.status(201).json({ message: "Avisos criados para todos os usuários", avisos: avisosCriados });
+          console.log("Aviso criado e mensagens enviadas.");
+          return res.status(201).json({ message: "Aviso criado para todos os usuários", aviso: novoAviso });
       } else {
           console.log(`Criando aviso para usuário específico: ${userId}`);
 
-          // Criar aviso para um único usuário
+          // Buscar usuário específico
+          const usuario = await User.findById(userId);
+          if (!usuario) {
+              return res.status(404).json({ message: "Usuário não encontrado" });
+          }
+
+          // Criar aviso para um usuário específico
           const novoAviso = await Aviso.create({ titulo, menssagem, userId });
 
-          return res.status(201).json({ message: "Aviso criado com sucesso", aviso: novoAviso });
+          // Esse trecho de código não está sendo utilizado no momento, mas pode ser utilizado para enviar mensagens de aviso
+          /*
+          // Enviar WhatsApp apenas para esse usuário, se ele tiver telefone
+          if (usuario.telefone) {
+              await sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem);
+          } */
+
+
+          return res.status(201).json({ message: "Aviso criado e enviado com sucesso", aviso: novoAviso });
       }
   } catch (error) {
       console.error("Erro ao criar aviso:", error);
-      res.status(500).json({ message: "Erro ao criar aviso", error });
+      res.status(500).json({ message: "Erro ao criar aviso", error: error.message });
   }
 };
 
@@ -48,37 +63,36 @@ export const criarAviso = async (req, res) => {
 
 
 
+
 export const criarAvisoParaTodos = async (req, res) => {
   try {
-    
-    const { titulo, menssagem } = req.body;
+      const { titulo, menssagem } = req.body;
 
-    if (!titulo || !menssagem) {
-      return res.status(400).json({ message: "Título e mensagem são obrigatórios." });
-    }
+      if (!titulo || !menssagem) {
+          return res.status(400).json({ message: "Título e mensagem são obrigatórios." });
+      }
 
-    // Buscar todos os usuários
-    const usuarios = await User.find();  
+      // Criar um único aviso para todos os usuários
+      const novoAviso = await Aviso.create({ titulo, menssagem, userId: "todos" });
 
-    if (usuarios.length === 0) {
-      return res.status(400).json({ message: "Nenhum usuário encontrado." });
-    }
+      // Buscar todos os usuários para enviar mensagem no WhatsApp
+      const usuarios = await User.find({ telefone: { $exists: true, $ne: null } });
 
-    // Criar um aviso para cada usuário
-    const avisos = usuarios.map(user => ({
-      userId: user._id,
-      titulo,
-      menssagem
-    }));
+      // Enviar mensagem no WhatsApp para cada usuário que tem telefone
+      // Essa função não está sendo utilizada no momento, mas pode ser utilizada para enviar mensagens de aviso
+      /*      
+      await Promise.all(
+          usuarios.map((usuario) => 
+              sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem)
+          )
+      );
+      */
 
-    // Salvar todos os avisos de uma vez
-    await Aviso.insertMany(avisos);
 
-    res.status(201).json({ message: "Avisos enviados para todos os usuários!" });
-
+      res.status(201).json(novoAviso);
   } catch (error) {
-    console.error("Erro ao cadastrar avisos:", error);  // Mostra o erro no console do backend
-    res.status(500).json({ message: "Erro ao cadastrar avisos", error: error.message });
+      console.error("Erro ao criar aviso:", error);
+      res.status(500).json({ message: "Erro ao criar aviso", error: error.message });
   }
 };
 
@@ -109,25 +123,34 @@ export const listarAvisosPorUsuario = async (req, res) => {
 // 🔹 Atualizar dados de um Avisos
 export const atualizarAviso = async (req, res) => {
   try {
-
-    // Pegando todos os campos do corpo da requisição
     const { id } = req.params;
-    const { titulo, menssagem, dataAviso, userId } = req.body; 
+    let { titulo, menssagem, userId } = req.body;
 
-    // Atualizando todos os campos informados
-    const AvisoAtualizado = await Aviso.findByIdAndUpdate(
+    // Se userId for "todos", removemos ele da atualização
+    if (userId === "todos") {
+      console.warn("userId recebido como 'todos', removendo da atualização.");
+      userId = undefined;
+    }
+
+    // Se userId for passado, validamos se é um ObjectId válido
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "ID de usuário inválido" });
+    }
+
+    const avisoAtualizado = await Aviso.findByIdAndUpdate(
       id,
-      { titulo, menssagem, dataAviso, userId },
+      { titulo, menssagem, ...(userId && { userId }) },
       { new: true }
     );
 
-    if (!AvisoAtualizado) {
-      return res.status(404).json({ message: "Aviso não encontrada" });
+    if (!avisoAtualizado) {
+      return res.status(404).json({ message: "Aviso não encontrado" });
     }
 
-    res.status(200).json({ message: "Aviso atualizado com sucesso!", Avisos: AvisoAtualizado });
+    res.status(200).json(avisoAtualizado);
   } catch (error) {
-    res.status(500).json({ message: "Erro ao atualizar Aviso", error });
+    console.error("Erro ao atualizar aviso:", error);
+    res.status(500).json({ message: "Erro ao atualizar aviso", error });
   }
 };
 
@@ -136,14 +159,40 @@ export const atualizarAviso = async (req, res) => {
 export const deletarAviso = async (req, res) => {
   try {
     const { id } = req.params;
-    const AvisoRemovido = await Avisos.findByIdAndDelete(id);
+    console.log(`Recebida solicitação para deletar ID: ${id}`);
 
-    if (!AvisoRemovido) {
+    // Se o ID for "todos", deletar todos os avisos globais
+    if (id === "todos") {
+      const avisosDeletados = await Aviso.deleteMany({ userId: "todos" });
+
+      if (avisosDeletados.deletedCount === 0) {
+        console.log("Nenhum aviso global encontrado para deletar.");
+        return res.status(404).json({ message: "Nenhum aviso global encontrado." });
+      }
+
+      console.log(`Avisos globais deletados: ${avisosDeletados.deletedCount}`);
+      return res.status(200).json({ message: `${avisosDeletados.deletedCount} avisos removidos com sucesso!` });
+    }
+
+    // Se não for "todos", validar como ObjectId normal
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log("ID inválido");
+      return res.status(400).json({ message: "ID inválido" });
+    }
+
+    const aviso = await Aviso.findById(id);
+    if (!aviso) {
+      console.log("Aviso não encontrado");
       return res.status(404).json({ message: "Aviso não encontrado" });
     }
 
+    console.log("Aviso encontrado, deletando...");
+    await Aviso.findByIdAndDelete(id);
+    console.log("Aviso deletado com sucesso!");
+
     res.status(200).json({ message: "Aviso removido com sucesso!" });
   } catch (error) {
-    res.status(500).json({ message: "Erro ao remover Aviso", error });
+    console.error("Erro ao remover aviso:", error);
+    res.status(500).json({ message: "Erro ao remover aviso", error: error.message });
   }
 };

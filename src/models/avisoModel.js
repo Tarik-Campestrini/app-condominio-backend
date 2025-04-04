@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const avisosSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  userId: { type: mongoose.Schema.Types.Mixed, required: true },
   titulo: { type: String, required: true },
   menssagem: { type: String, required: true },
   dataAviso: { type: Date, default: Date.now }
@@ -10,3 +10,4 @@ const avisosSchema = new mongoose.Schema({
 const Avisos = mongoose.model("Avisos", avisosSchema);
 
 export default Avisos;
+
