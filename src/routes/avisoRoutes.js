@@ -6,26 +6,26 @@ import {
   listarAvisosPorUsuario,
   atualizarAviso,
   deletarAviso,
+   
 } from "../controllers/avisoController.js";
 
 const router = express.Router();
 
-// Rota para criar uma Aviso
+router.post("/avisos/para-todos", criarAvisoParaTodos);
+
+// Rota para criar um aviso (para um usuário ou para todos)
 router.post("/", criarAviso);
 
-// Rota para enviar aviso a todos os usuários
-router.post("/todos", criarAvisoParaTodos);
-
-// Rota para listar todas as Avisos
+// Rota para listar todos os avisos
 router.get("/", listarAvisos);
 
-// Rota para listar Avisos de um usuário específico
+// Rota para listar avisos de um usuário específico
 router.get("/:userId", listarAvisosPorUsuario);
 
-// Rota para atualizar o status de uma Aviso
+// Rota para atualizar um aviso
 router.put("/:id", atualizarAviso);
 
-// Rota para deletar uma Aviso
+// Rota para deletar um aviso
 router.delete("/:id", deletarAviso);
 
 export default router;

@@ -1,110 +1,125 @@
 import Aviso from "../models/avisoModel.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
-//import { sendTemplateMessageAviso } from "../services/whatsappService.js";
+import { sendTemplateMessageAviso } from "../services/whatsappService.js";
+
 
 export const criarAviso = async (req, res) => {
   try {
-      const { titulo, menssagem, userId } = req.body;
+    const { titulo, mensagem, userId } = req.body;
 
-      if (!titulo || !menssagem) {
-          return res.status(400).json({ message: "Título e mensagem são obrigatórios" });
-      }
+    if (!titulo || !mensagem) {
+      return res.status(400).json({ mensagem: "Título e mensagem são obrigatórios" });
+    }
 
-      if (userId === "todos") {
-          console.log("Criando um único aviso para todos os usuários...");
+    // Aviso para todos os usuários
+    if (userId === "todos") {
+      console.log("Criando aviso para todos os usuários...");
 
-          // Criar um único aviso para todos
-          const novoAviso = await Aviso.create({ titulo, menssagem, userId: "todos" });
+      const usuarios = await User.find({ telefone: { $exists: true, $ne: "" } });
 
-          // Buscar todos os usuários que têm telefone para enviar WhatsApp
-          const usuarios = await User.find({ telefone: { $exists: true, $ne: null } });
+      const promessas = usuarios.map(async (user) => {
+        await Aviso.create({
+          titulo,
+          mensagem,
+          userId: user._id,
+          dataAviso: new Date(),
+        });
 
-          // Essa função não está sendo utilizada no momento, mas pode ser utilizada para enviar mensagens de aviso
-          /*
-          // Enviar mensagem para cada usuário via WhatsApp
-          await Promise.all(
-              usuarios.map((usuario) => 
-                  sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem)
-              )
-          ); */
+        await sendTemplateMessageAviso(user.telefone, user.nome, mensagem);
+      });
 
-          console.log("Aviso criado e mensagens enviadas.");
-          return res.status(201).json({ message: "Aviso criado para todos os usuários", aviso: novoAviso });
-      } else {
-          console.log(`Criando aviso para usuário específico: ${userId}`);
+      await Promise.all(promessas);
 
-          // Buscar usuário específico
-          const usuario = await User.findById(userId);
-          if (!usuario) {
-              return res.status(404).json({ message: "Usuário não encontrado" });
-          }
+      return res.status(201).json({ mensagem: "Avisos criados e enviados para todos os usuários!" });
+    }
 
-          // Criar aviso para um usuário específico
-          const novoAviso = await Aviso.create({ titulo, menssagem, userId });
+    // Aviso individual
+    const usuario = await User.findById(userId);
+    if (!usuario) {
+      return res.status(404).json({ mensagem: "Usuário não encontrado" });
+    }
 
-          // Esse trecho de código não está sendo utilizado no momento, mas pode ser utilizado para enviar mensagens de aviso
-          /*
-          // Enviar WhatsApp apenas para esse usuário, se ele tiver telefone
-          if (usuario.telefone) {
-              await sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem);
-          } */
+    const novoAviso = await Aviso.create({
+      titulo,
+      mensagem,
+      userId,
+      dataAviso: new Date(),
+    });
 
+    if (usuario.telefone) {
+      await sendTemplateMessageAviso(usuario.telefone, usuario.nome, mensagem);
+    }
 
-          return res.status(201).json({ message: "Aviso criado e enviado com sucesso", aviso: novoAviso });
-      }
+    return res.status(201).json({ mensagem: "Aviso criado com sucesso", aviso: novoAviso });
+
   } catch (error) {
-      console.error("Erro ao criar aviso:", error);
-      res.status(500).json({ message: "Erro ao criar aviso", error: error.message });
+    console.error("Erro ao criar aviso:", error);
+    res.status(500).json({ mensagem: "Erro ao criar aviso", error: error.message });
   }
 };
-
-
-
-
 
 
 export const criarAvisoParaTodos = async (req, res) => {
   try {
-      const { titulo, menssagem } = req.body;
+    const { titulo, mensagem, dataAviso } = req.body;
 
-      if (!titulo || !menssagem) {
-          return res.status(400).json({ message: "Título e mensagem são obrigatórios." });
+    const usuarios = await User.find();
+
+    const promessas = usuarios.map(async (user) => {
+      const novoAviso = new Aviso({
+        titulo,
+        mensagem,
+        dataAviso,
+        userId: user._id,
+      });
+
+      await novoAviso.save();
+
+      if (user.telefone) {
+        await enviarWhatsApp({
+          numero: user.telefone,
+          mensagem: `📢 *${titulo}*\n\n${mensagem}`,
+        });
       }
+    });
 
-      // Criar um único aviso para todos os usuários
-      const novoAviso = await Aviso.create({ titulo, menssagem, userId: "todos" });
+    await Promise.all(promessas);
 
-      // Buscar todos os usuários para enviar mensagem no WhatsApp
-      const usuarios = await User.find({ telefone: { $exists: true, $ne: null } });
-
-      // Enviar mensagem no WhatsApp para cada usuário que tem telefone
-      // Essa função não está sendo utilizada no momento, mas pode ser utilizada para enviar mensagens de aviso
-      /*      
-      await Promise.all(
-          usuarios.map((usuario) => 
-              sendTemplateMessageAviso(usuario.telefone, usuario.nome, menssagem)
-          )
-      );
-      */
-
-
-      res.status(201).json(novoAviso);
+    res
+      .status(201)
+      .json({ mensagem: "Avisos criados e enviados com sucesso para todos!" });
   } catch (error) {
-      console.error("Erro ao criar aviso:", error);
-      res.status(500).json({ message: "Erro ao criar aviso", error: error.message });
+    console.error("Erro ao criar avisos para todos:", error);
+    res.status(500).json({ erro: "Erro ao criar avisos para todos os usuários" });
   }
 };
-
-
 
 
 //  Buscar todos os Avisos com informações do usuário
 export const listarAvisos = async (req, res) => {
   try {
-    const Avisos = await Aviso.find().populate("userId", "nome apartamento bloco telefone"); // Popula os dados do usuário
-    res.status(200).json(Avisos);
+    let avisos = await Aviso.find().populate("userId", "nome apartamento bloco telefone");
+
+    // Inserir nome fictício quando userId for "todos"
+    avisos = avisos.map((aviso) => {
+      if (aviso.userId === "todos" || aviso.userId === null) {
+        return {
+          ...aviso.toObject(),
+          userId: {
+            nome: "Todos os usuários",
+            apartamento: "-",
+            bloco: "-",
+            telefone: "-"
+          }
+        };
+      }
+      return aviso;
+    });
+
+    res.status(200).json(avisos);
   } catch (error) {
+    console.error("Erro ao buscar Avisos:", error);
     res.status(500).json({ message: "Erro ao buscar Avisos", error });
   }
 };
@@ -124,7 +139,7 @@ export const listarAvisosPorUsuario = async (req, res) => {
 export const atualizarAviso = async (req, res) => {
   try {
     const { id } = req.params;
-    let { titulo, menssagem, userId } = req.body;
+    let { titulo, mensagem, userId } = req.body;
 
     // Se userId for "todos", removemos ele da atualização
     if (userId === "todos") {
@@ -139,7 +154,7 @@ export const atualizarAviso = async (req, res) => {
 
     const avisoAtualizado = await Aviso.findByIdAndUpdate(
       id,
-      { titulo, menssagem, ...(userId && { userId }) },
+      { titulo, mensagem, ...(userId && { userId }) },
       { new: true }
     );
 

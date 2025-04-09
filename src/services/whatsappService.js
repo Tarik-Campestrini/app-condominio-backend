@@ -157,3 +157,44 @@ export const sendTemplateMessageCadastrar = async (phoneNumber, nome, email, sen
         throw error;
     }
 };
+
+export const sendTemplateMessageAviso = async (phoneNumber, nome, mensagem) => {
+    try {
+      phoneNumber = phoneNumber.replace(/\D/g, "");
+      if (!phoneNumber.startsWith("55")) {
+        phoneNumber = `55${phoneNumber}`;
+      }
+  
+      const payload = {
+        messaging_product: "whatsapp",
+        to: phoneNumber,
+        type: "template",
+        template: {
+          name: "aviso",
+          language: { code: "en_US" },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                { type: "text", text: nome },
+                { type: "text", text: mensagem }
+              ]
+            }
+          ]
+        }
+      };
+  
+      const response = await axios.post(WHATSAPP_API_URL, payload, {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      });
+  
+      console.log("✅ Aviso enviado via WhatsApp:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Erro ao enviar aviso:", error.response?.data || error.message);
+      throw error;
+    }
+  };

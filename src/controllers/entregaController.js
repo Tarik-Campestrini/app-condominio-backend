@@ -4,10 +4,11 @@ import { sendTemplateMessageEntrega } from "../services/whatsappService.js";
 
 
 
-//  Criar Entrega
-// Criar Entrega
+
+// Cria a entrega no banco e envia notificação via WhatsApp
 export const criarEntrega = async (req, res) => {
   try {
+
       // Verifica se a data foi enviada, senão usa a data atual
       const dataEntrega = req.body.dataEntrega 
           ? new Date(req.body.dataEntrega) 
@@ -54,10 +55,7 @@ export const criarEntrega = async (req, res) => {
 };
 
 
-
-
-
-//  Buscar todas as entregas
+//  Buscar todas as entregas no banco de dados
 export const listarEntregas = async (req, res) => {
   try {
     const entregas = await Entrega.find().populate("userId", "nome apartamento bloco telefone"); // Popula os dados do usuário
@@ -68,8 +66,7 @@ export const listarEntregas = async (req, res) => {
 };
 
 
-//  Buscar entregas por usuário
-//  Buscar entregas por usuário com informações do usuário
+//  Buscar entregas por usuário no banco de dados
 export const listarEntregasPorUsuario = async (req, res) => {
   try {
     const entregas = await Entrega.find().populate("userId", "nome apartamento bloco telefone");
@@ -79,13 +76,14 @@ export const listarEntregasPorUsuario = async (req, res) => {
   }
 };
 
-// 🔹 Atualizar dados de uma entrega
+
+//  Atualiza dados de uma entrega no banco de dados
 export const atualizarEntrega = async (req, res) => {
   try {
     const { id } = req.params;
     const { descricao, status, dataEntrega, userId } = req.body;
 
-    // Atualizar os dados da entrega
+    // Atualiza os dados da entrega
     const entregaAtualizada = await Entrega.findByIdAndUpdate(
       id,
       { descricao, status, dataEntrega, userId },
@@ -94,19 +92,7 @@ export const atualizarEntrega = async (req, res) => {
 
     if (!entregaAtualizada) {
       return res.status(404).json({ message: "Entrega não encontrada" });
-    }
-
-    // 🔹 Buscar dados do usuário para enviar WhatsApp
-    const usuario = await Usuario.findById(userId);
-    if (usuario) {
-      const phoneNumber = `55${usuario.telefone}`;
-      const nome = usuario.nome;
-      const entrega = descricao;
-      const data = dataEntrega || new Date().toLocaleDateString("pt-BR");
-
-      // 🔹 Enviar mensagem via WhatsApp
-      await sendTemplateHelloWorld(phoneNumber, nome, entrega, data);
-    }
+    }   
 
     res.status(200).json({ message: "Entrega atualizada com sucesso!", entrega: entregaAtualizada });
   } catch (error) {
@@ -115,7 +101,7 @@ export const atualizarEntrega = async (req, res) => {
 };
 
 
-// 🔹 Deletar uma entrega
+// Deleta uma entrega no banco de dados
 export const deletarEntrega = async (req, res) => {
   try {
     const { id } = req.params;
