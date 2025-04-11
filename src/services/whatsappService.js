@@ -160,10 +160,21 @@ export const sendTemplateMessageCadastrar = async (phoneNumber, nome, email, sen
 
 export const sendTemplateMessageAviso = async (phoneNumber, nome, mensagem) => {
     try {
+      // Sanitizar número de telefone
       phoneNumber = phoneNumber.replace(/\D/g, "");
       if (!phoneNumber.startsWith("55")) {
         phoneNumber = `55${phoneNumber}`;
       }
+  
+      // Sanitizar nome e mensagem para evitar erros da API do WhatsApp
+      const sanitizeText = (text) =>
+        text
+          .replace(/\n/g, ' ')         // remove quebras de linha
+          .replace(/\t/g, ' ')         // remove tabulações
+          .replace(/ {5,}/g, '    ')   // limita espaços consecutivos a 4
+  
+      nome = sanitizeText(nome);
+      mensagem = sanitizeText(mensagem);
   
       const payload = {
         messaging_product: "whatsapp",
